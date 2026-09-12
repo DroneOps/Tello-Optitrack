@@ -278,7 +278,7 @@ class TelloController(Node):
             self.last_print_time = time.time()
 
         if x_ok and y_ok and z_ok:
-            self.get_logger().warn("Target reached. Publishing flag...")
+            self.get_logger().warn("Target reached.")
             msg = Bool()
             msg.data = True
             self.reached_pub.publish(msg)

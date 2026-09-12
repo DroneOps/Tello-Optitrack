@@ -119,6 +119,35 @@ class PosePlotter(Node):
             pass
             
         ax.legend()
+        
+        # Save plots
+        import os
+        from datetime import datetime
+        
+        # Find the root of the workspace to locate the docs folder
+        current_dir = os.path.abspath(os.path.dirname(__file__))
+        ws_root = current_dir
+        while ws_root != "/":
+            if os.path.exists(os.path.join(ws_root, "docs")):
+                break
+            ws_root = os.path.dirname(ws_root)
+            
+        save_dir = os.path.join(ws_root, 'docs', 'controller_plots')
+        os.makedirs(save_dir, exist_ok=True)
+            
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file1 = os.path.join(save_dir, f"telemetry_{timestamp}.png")
+        file2 = os.path.join(save_dir, f"trajectory3d_{timestamp}.png")
+        
+        fig1.savefig(file1, bbox_inches='tight')
+        fig2.savefig(file2, bbox_inches='tight')
+        
+        print("\n" + "="*55)
+        print("[+] PLOTS SAVED SUCCESSFULLY!")
+        print(f"    -> {file1}")
+        print(f"    -> {file2}")
+        print("="*55 + "\n")
+        
         plt.show()
 
 

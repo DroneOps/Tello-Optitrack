@@ -72,8 +72,30 @@ def plot_data(data, axis):
     axs[2].grid(True)
     
     plt.tight_layout()
-    plt.savefig(f"plot_{axis}.png")
-    print(f"Plot saved as plot_{axis}.png")
+    
+    import os
+    from datetime import datetime
+    
+    current_dir = os.path.abspath(os.path.dirname(__file__))
+    ws_root = current_dir
+    while ws_root != "/":
+        if os.path.exists(os.path.join(ws_root, "docs")):
+            break
+        ws_root = os.path.dirname(ws_root)
+        
+    save_dir = os.path.join(ws_root, 'docs', 'axis_test_plots')
+    os.makedirs(save_dir, exist_ok=True)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_path = os.path.join(save_dir, f"axis_test_{axis}_{timestamp}.png")
+    
+    plt.savefig(file_path, bbox_inches='tight')
+    
+    print("\n" + "="*55)
+    print("[+] AXIS TEST PLOT SAVED SUCCESSFULLY!")
+    print(f"    -> {file_path}")
+    print("="*55 + "\n")
+    
     plt.show()
 
 from check_status import connect_and_check

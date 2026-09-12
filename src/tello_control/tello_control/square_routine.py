@@ -10,6 +10,10 @@ class SquareRoutine(Node):
         self.goal_pub = self.create_publisher(PoseStamped, '/goal', 10)
         self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.reached_callback, 10)
         
+        # Declare parameter for wait time at each waypoint
+        self.declare_parameter('wait_time', 2.0)
+        self.wait_time = self.get_parameter('wait_time').value
+        
         # Define the waypoints for the square and finally returning to center
         self.waypoints = [
             (1.0, 1.0, 1.0),
@@ -46,12 +50,12 @@ class SquareRoutine(Node):
     def reached_callback(self, msg):
         # Only process if we are actively waiting for the drone to reach the point
         if msg.data and self.waiting_for_reach:
-            self.get_logger().info("Waypoint reached! Stabilizing for 3 seconds...")
+            self.get_logger().info(f"Waypoint reached! Stabilizing for {self.wait_time} seconds...")
             self.waiting_for_reach = False
             self.current_idx += 1
             
-            # Wait 3 seconds before sending the next waypoint
-            self.wait_timer = self.create_timer(3.0, self.next_wp_callback)
+            # Wait for the specified time before sending the next waypoint
+            self.wait_timer = self.create_timer(self.wait_time, self.next_wp_callback)
 
     def next_wp_callback(self):
         self.wait_timer.cancel()

@@ -110,6 +110,12 @@ To run it, simply execute:
 ```bash
 ros2 run tello_control square_routine
 ```
+
+**Optional:** You can specify how long the drone should wait (hover) at each waypoint before moving to the next one by passing the `wait_time` argument (default is 2.0 seconds):
+```bash
+ros2 run tello_control square_routine --ros-args -p wait_time:=3.5
+```
+
 When it finishes, the drone will hover at the center `(0, 0, 1)`. You can land the drone at any time by pressing `Ctrl+C` in the terminal running the `tello_controller` node.
 
 ## Utilities
@@ -137,7 +143,12 @@ The project is divided into key packages and nodes that communicate via a Publis
    * **Publishes:** `/drone/pose` geometry_msgs/PoseStamped.
    * Fetches tracking data from the Motive server and sends it to the Linux PC.
    * *Note: The `natnet_ros2` package (included as a submodule) is developed by L2S-lab at https://github.com/L2S-lab/natnet_ros2. Citation for their work can be found at https://hal.science/hal-04150950.*
+### Automatic Plot Saving
+Whenever you finish a flight using `pose_plotter.py` (by pressing Ctrl+C) or when a diagnostic test finishes via `axis_test.py`, the generated telemetry and 3D trajectory graphs are **automatically saved** with a timestamp in the following folders:
+* `docs/controller_plots/`
+* `docs/axis_test_plots/`
 
+The terminal will print the exact path where the `.png` files were saved for easy reference.
 2. **Control Node `tello_controller`**: 
    * **Subscribes to:** `/drone/pose` to get the current drone position and `/goal` to get the desired target.
    * Calculates the proportional control velocities and directly sends RC commands to the Tello drone over WiFi via the `djitellopy` library.
