@@ -90,22 +90,14 @@ class TelloController(Node):
                 self.Kp_x = float(self.config["GAINS"]["Kp_x"])
                 self.Kp_y = float(self.config["GAINS"]["Kp_y"])
                 self.Kp_z = float(self.config["GAINS"]["Kp_z"])
-                self.get_logger().info(
-                    f"Loaded gains from pi.conf -> P_x: {self.Kp_x}, P_y: {
-                        self.Kp_y
-                    }, P_z: {self.Kp_z}"
-                )
+                self.get_logger().info(f"Loaded gains from pi.conf -> P_x: {self.Kp_x}, P_y: {self.Kp_y}, P_z: {self.Kp_z}")
             except KeyError as e:
                 self.get_logger().error(
                     f"CRITICAL: Missing gain {e} in pi.conf. Aborting flight."
                 )
                 sys.exit(1)
         else:
-            self.get_logger().error(
-                f"CRITICAL: pi.conf not found at {
-                    pi_conf_path
-                }. Refusing to fly without gains. Aborting."
-            )
+            self.get_logger().error(f"CRITICAL: pi.conf not found at {pi_conf_path}. Refusing to fly without gains. Aborting.")
             sys.exit(1)
 
     def signal_handler(self, sig, frame):
@@ -127,10 +119,7 @@ class TelloController(Node):
         self.Desired_x = msg.pose.position.x
         self.Desired_y = msg.pose.position.y
         self.Desired_z = msg.pose.position.z
-        self.get_logger().info(
-            f"New objective: ({self.Desired_x}, {
-                self.Desired_y}, {self.Desired_z})"
-        )  # log the new goal for debugging purposes
+        self.get_logger().info(f"New objective: ({self.Desired_x}, {self.Desired_y}, {self.Desired_z})")  # log the new goal for debugging purposes
 
     def data_callback(self, msg):
         """callback function to capture the current position and orientation of the drone from optitrack data"""
@@ -254,12 +243,7 @@ class TelloController(Node):
             self.last_print_time = 0
 
         if time.time() - self.last_print_time > 0.5:
-            print(
-                f"Distance to target -> x: {abs(self.P[0] - self.Desired_x):.3f}m | y: {
-                    abs(self.P[1] - self.Desired_y):.3f}m | z: {
-                    abs(self.P[2] - self.Desired_z):.3f}m",
-                flush=True,
-            )
+            print(f"Distance to target -> x: {abs(self.P[0] - self.Desired_x):.3f}m | y: {abs(self.P[1] - self.Desired_y):.3f}m | z: {abs(self.P[2] - self.Desired_z):.3f}m", flush=True)
             self.last_print_time = time.time()
 
         if x_ok and y_ok and z_ok:
