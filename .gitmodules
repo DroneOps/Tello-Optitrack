@@ -1,0 +1,3 @@
+[submodule "src/natnet_ros2"]
+	path = src/natnet_ros2
+	url = https://github.com/L2S-lab/natnet_ros2

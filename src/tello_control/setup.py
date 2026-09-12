@@ -10,7 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/cinematic_with_plot.launch.py']),
+        ('share/' + package_name + '/launch', ['launch/tello_with_plot.launch.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,8 +21,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'cinematic_control = tello_control.cinematic_control:main',
+            'tello_controller = tello_control.tello_controller:main',
             'pose_plotter = tello_control.pose_plotter:main',
+            'square_routine = tello_control.square_routine:main',
         ],
     },
 )

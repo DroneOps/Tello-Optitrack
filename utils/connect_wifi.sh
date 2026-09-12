@@ -3,12 +3,9 @@
 #Script to connect to the Tello drone's WiFi network.
 IFACE="wlan0"
 
-# name of the WiFi network to connect to, in this case the default SSID of the Tello drone, but it can be different
-# if the drone has been configured with a different SSID. Make sure to change it if your drone has a different SSID.
-SSID="TELLO-374539"
-
-# leave empty if the network does not have a password
-PASSWORD=""
+# Load configuration from tello.conf
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "$DIR/tello.conf"
 
 # Check if already connected to the desired network
 CURRENT=$(nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2)
@@ -23,7 +20,7 @@ if [ -n "$PASSWORD" ]; then
     echo " Connecting to $SSID with password..."
     nmcli dev wifi connect "$SSID" password "$PASSWORD"
 else
-    echo " Connecting to $SSID (no password)..."
+    echo " Connecting to $SSID without password..."
     nmcli dev wifi connect "$SSID"
 fi
 

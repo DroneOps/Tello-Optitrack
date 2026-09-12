@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
 from djitellopy import Tello # Library to control the Tello drone, it is a wrapper around the official SDK of the drone that allows us to send commands to the drone and receive data from it.
 from scipy.spatial.transform import Rotation as R
 import numpy as np
@@ -13,15 +14,21 @@ import sys
  and it sends this velocity to the drone using the send_rc_control method of the djitellopy library. 
  Rotation Matrix is used to transform the velocity from the inertial frame to the body frame of the drone, which is the frame that the drone uses to control its movement.'''
 
-class CinematicControl(Node):
+class TelloController(Node):
     def __init__(self):
-        super().__init__('cinematic_control')
+        super().__init__('tello_controller')
+        
+        # Declare parameter for rigid body name (defaults to 'drone')
+        self.declare_parameter('rigid_body_name', 'drone')
+        self.rigid_body_name = self.get_parameter('rigid_body_name').get_parameter_value().string_value
+
         #flag
         self.has_taken_off = False
 
-        #ros2 suscriber to optitrack data
+        # ros2 suscriber to optitrack data
+        optitrack_topic = f'/{self.rigid_body_name}/pose'
         self.subscription = self.create_subscription(
-            PoseStamped, '/drone/pose', #topic name from natnet_ros2 package
+            PoseStamped, optitrack_topic, #topic name from natnet_ros2 package
             self.data_callback,
             10
         )
@@ -30,11 +37,27 @@ class CinematicControl(Node):
             PoseStamped, "/goal", self.goal_callback, 10
         )
 
-        #connect to tello drone from the djitellopy library
-        self.drone = Tello()
-        self.drone.connect()
-        #wait until is connected
+        # publisher for goal reached
+        self.reached_pub = self.create_publisher(Bool, '/goal_reached', 10)
 
+        # Connect to Tello using the utils check_status script
+        import sys
+        import os
+        # Add the utils folder to sys.path to import check_status
+        # The node is in src/tello_control/tello_control/
+        # so utils is 4 levels up from this file's directory
+        utils_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../utils"))
+        if os.path.exists(utils_path) and utils_path not in sys.path:
+            sys.path.append(utils_path)
+            
+        try:
+            from check_status import connect_and_check
+            self.drone = connect_and_check()
+        except ImportError:
+            self.get_logger().error("Could not import check_status from utils. Check paths.")
+            self.drone = Tello()
+            self.drone.connect()
+            
         # Initialize velocities
         self.InercialVel = np.zeros(3)
         self.angularVel = 0
@@ -46,14 +69,17 @@ class CinematicControl(Node):
     
     def signal_handler(self, sig, frame):
         # Handle Ctrl+C signal to land the drone safely and shutdown ROS2
-        print("\n[!] Ctrl+C detected. Landing..")
+        print("\n[!] Ctrl+C detected. Stopping and landing...")
         try:
-            self.drone.land()
+            if self.has_taken_off:
+                self.drone.send_rc_control(0, 0, 0, 0)
+                self.drone.land()
             self.drone.end()
         except Exception as e:
-            print(f"Error to land: {e}")
-        rclpy.shutdown()
-        sys.exit(0)
+            print(f"Error during shutdown: {e}")
+        finally:
+            rclpy.shutdown()
+            sys.exit(0)
 
     def goal_callback(self, msg):
         #capture the desired position from the goal topic from the user input
@@ -101,8 +127,8 @@ class CinematicControl(Node):
         self.calculateVelocities()
         #send data after processing
         self.sendDataToTello()
-        #check if it is close enough to land 
-        self.LandIfDesired()
+        #check if it is close enough to the target
+        self.CheckIfReached()
 
     '''control variables'''
     def control_variables(self):
@@ -161,28 +187,30 @@ class CinematicControl(Node):
         self.drone.send_rc_control(vx, vy, vz, self.angularVel) 
 
 
-    def LandIfDesired(self):
-        tol_ratio = 0.80 # Land the drone once it has reached at least precision_threshold (90%) of the target position.
-        #this is done due to the fact that the drone may not be able to reach the exact position due to the control loop and the dynamics of the drone, so we allow it to land once it is close enough to the target position. 
-        # This is a common practice in control systems to avoid oscillations around the target position and to ensure a smooth landing.
+    def CheckIfReached(self):
+        # Check if the drone is close enough to the target position
+        # We use a 15 cm threshold 
+        distance_threshold = 0.15
 
-        x_ok = abs(self.P[0] - self.Desired_x) <= (1 - tol_ratio) * abs(self.Desired_x) or self.Desired_x == 0
-        y_ok = abs(self.P[1] - self.Desired_y) <= (1 - tol_ratio) * abs(self.Desired_y) or self.Desired_y == 0
-        z_ok = abs(self.P[2] - self.Desired_z) <= (1 - tol_ratio) * abs(self.Desired_z) or self.Desired_z == 0
+        x_ok = abs(self.P[0] - self.Desired_x) <= distance_threshold
+        y_ok = abs(self.P[1] - self.Desired_y) <= distance_threshold
+        z_ok = abs(self.P[2] - self.Desired_z) <= distance_threshold
 
-        #log the distance to the target position for debugging purposes
+        # log the distance to the target position for debugging purposes
         self.get_logger().info(
             f"Distance to target: x: {abs(self.P[0] - self.Desired_x):.3f}, y: {abs(self.P[1] - self.Desired_y):.3f}, z: {abs(self.P[2] - self.Desired_z):.3f}"
         )
+        
         if x_ok and y_ok and z_ok:
-            self.get_logger().warn(f"Close enough (~80%). Landing...")
-            self.drone.land() #send land command to the drone
-            self.has_taken_off = False #reset the flag to allow taking off again if a new goal is received after landing
+            self.get_logger().warn("Target reached. Publishing flag...")
+            msg = Bool()
+            msg.data = True
+            self.reached_pub.publish(msg)
 
 def main(args=None):
     '''main function to run the node'''
     rclpy.init(args=args)
-    node = CinematicControl()
+    node = TelloController()
 
     # Handle Ctrl+C signal to land the drone safely and shutdown ROS2
     signal.signal(signal.SIGINT, lambda sig, frame: node.signal_handler(sig, frame)) 

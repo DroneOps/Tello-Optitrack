@@ -14,7 +14,13 @@ The script also handles the Ctrl+C signal to plot the data'''
 class PosePlotter(Node):
     def __init__(self):
         super().__init__('pose_plotter')
-        self.subscription = self.create_subscription(PoseStamped, '/drone/pose', self.callback, 10)
+        
+        # Declare parameter for rigid body name (defaults to 'drone')
+        self.declare_parameter('rigid_body_name', 'drone')
+        rigid_body_name = self.get_parameter('rigid_body_name').get_parameter_value().string_value
+        optitrack_topic = f'/{rigid_body_name}/pose'
+
+        self.subscription = self.create_subscription(PoseStamped, optitrack_topic, self.callback, 10)
 
          #suscriber to goal topic 
         self.goal_sub = self.create_subscription(
