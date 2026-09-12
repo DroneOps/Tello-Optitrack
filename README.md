@@ -33,10 +33,10 @@ The specific Python libraries used are `djitellopy`, `scipy`, `numpy`, and `matp
 To ensure the drone movements correspond logically to the motion capture system, configure the physical space and the **Motive** software as follows:
 
 ### Axis Alignment
-Adjust the ground plane so that the axes align perfectly with the drone expected behavior, preventing any confusion during flight commands:
+Adjust the ground plane so that the axes align perfectly with the standard ROS coordinate frame (FLU). This prevents any confusion during flight commands:
+* **X-axis:** Forward
+* **Y-axis:** Left
 * **Z-axis:** Up / Altitude
-* **X-axis:** Right
-* **Y-axis:** Forward
 
 ![Ground Plane Adjustment](docs/images/GroundPlane.jpeg)
 
@@ -120,10 +120,10 @@ The `utils` folder contains standalone scripts for hardware testing and automati
 * **axis_test.py**: Standalone script to test the drone's physical response and sensors without using OptiTrack. It connects to the drone, takes off, sends a pure RC velocity command on a specified axis, logs the internal IMU telemetry, lands, and generates a `.png` plot with the results.
   Run it from the root of the workspace:
   ```bash
-  python3 utils/axis_test.py --axis all --duration 3
+  python3 utils/axis_test.py --axis=all --duration=3
   ```
   **Arguments:**
-  * `--axis`: The axis to test. Available options are `x`, `-x`, `y`, `-y`, `z`, `-z`, `yaw`, `-yaw`, or `all`. If no arguments are passed, the drone will safely default to `z` and move Up. (Note: use `=` for negative axes, e.g., `--axis=-x`)
+  * `--axis`: The axis to test. Available options are `x`, `-x`, `y`, `-y`, `z`, `-z`, `yaw`, `-yaw`, or `all`. If no arguments are passed, the drone will safely default to `z` and move Up.
   * `--duration`: Time in seconds to hold the velocity command per axis. Default is `3`.
 
 * **connect_wifi.sh**: A bash script that reads the SSID and password from the `tello.conf` configuration file and forces the Linux network manager to connect to the Tello network.

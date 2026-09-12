@@ -181,10 +181,18 @@ class TelloController(Node):
         #we use a scale factor to convert the velocity from m/s to the range of -100 to 100 that the tello accepts for rc control. We also clip the values to ensure they are within the acceptable range.
 
         scale = 20
-        vx = int(np.clip(self.BodyVelocity[0]*scale, -100, 100))
-        vy = int(np.clip(self.BodyVelocity[1]*scale, -100, 100))
-        vz = int(np.clip(self.BodyVelocity[2]*scale, -100, 100))
-        self.drone.send_rc_control(vx, vy, vz, self.angularVel) 
+        # In our ROS FLU frame:
+        # BodyVelocity[0] is X (Forward)
+        # BodyVelocity[1] is Y (Left)
+        # BodyVelocity[2] is Z (Up)
+        
+        # djitellopy send_rc_control expects: (Left/Right, Forward/Backward, Up/Down, Yaw)
+        # It expects positive for Right, so we invert Y (Left).
+        lr_command = int(np.clip(-self.BodyVelocity[1]*scale, -100, 100))
+        fb_command = int(np.clip(self.BodyVelocity[0]*scale, -100, 100))
+        ud_command = int(np.clip(self.BodyVelocity[2]*scale, -100, 100))
+        
+        self.drone.send_rc_control(lr_command, fb_command, ud_command, self.angularVel) 
 
 
     def CheckIfReached(self):

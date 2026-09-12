@@ -15,13 +15,13 @@ def run_test(drone, axis, duration):
         base_axis = axis
 
     if base_axis == "x":
-        vx = speed
-        movement_desc = f"({'+' if speed>0 else '-'}) {'Right' if speed>0 else 'Left'}"
-    elif base_axis == "y":
-        vy = speed
+        vx = speed # X is Forward
         movement_desc = f"({'+' if speed>0 else '-'}) {'Forward' if speed>0 else 'Backward'}"
+    elif base_axis == "y":
+        vy = speed # Y is Left
+        movement_desc = f"({'+' if speed>0 else '-'}) {'Left' if speed>0 else 'Right'}"
     elif base_axis == "z":
-        vz = speed
+        vz = speed # Z is Up
         movement_desc = f"({'+' if speed>0 else '-'}) {'Up' if speed>0 else 'Down'}"
     elif base_axis == "yaw":
         y_vel = speed
@@ -32,7 +32,9 @@ def run_test(drone, axis, duration):
     
     start_time = time.time()
     while time.time() - start_time < duration:
-        drone.send_rc_control(vx, vy, vz, y_vel)
+        # send_rc_control expects (left_right, forward_backward, up_down, yaw)
+        # Note: left_right expects positive for Right. Since our Y is Left, we send -vy.
+        drone.send_rc_control(-vy, vx, vz, y_vel)
         
         data["time"].append(time.time() - start_time)
         data["vx"].append(drone.get_speed_x())
