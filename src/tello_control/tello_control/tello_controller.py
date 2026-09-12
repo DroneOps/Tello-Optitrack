@@ -54,11 +54,13 @@ class TelloController(Node):
         # Search for the utils folder by walking up the directory tree
         # This works regardless of symlink-install or regular install
         current_dir = os.path.abspath(os.path.dirname(__file__))
+        ws_root = current_dir
         while current_dir != "/":
             potential_utils = os.path.join(current_dir, "utils")
             if os.path.exists(os.path.join(potential_utils, "check_status.py")):
                 if potential_utils not in sys.path:
                     sys.path.append(potential_utils)
+                ws_root = current_dir
                 break
             current_dir = os.path.dirname(current_dir)
 
