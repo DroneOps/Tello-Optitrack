@@ -30,23 +30,22 @@ The specific Python libraries used are `djitellopy`, `scipy`, `numpy`, and `matp
 
 ## Hardware Configuration
 
-To ensure the drone movements correspond logically to the motion capture system, configure the physical space and the **Motive** software as follows:
+To ensure the drone movements correspond logically to the motion capture system, the most critical step is **how you align the drone when creating its Rigid Body in Motive**. The global ground plane calibration in Motive is secondary; what matters is the orientation of the Rigid Body's local axes.
 
-### Axis Alignment
-Adjust the ground plane so that the axes align perfectly with the standard ROS coordinate frame (FLU). This prevents any confusion during flight commands:
-* **X-axis:** Forward
-* **Y-axis:** Left
-* **Z-axis:** Up / Altitude
+### Creating the Rigid Body (Axis Concordance)
+When you place the drone on the floor to create the Rigid Body, ensure its physical orientation matches the standard ROS coordinate frame (FLU). Look at the axes in the Motive software and align the physical drone such that:
+* **X-axis:** Points exactly to the **Front** of the drone.
+* **Y-axis:** Points to the **Left** of the drone.
+* **Z-axis:** Points **Up**.
 
-![Ground Plane Adjustment](docs/images/GroundPlane.jpeg)
+*Note: Even though Motive might visually display the axes slightly differently on screen, the `natnet_ros2` driver automatically applies coordinate transformations to output standard ROS FLU. Therefore, always calibrate based on X=Front, Y=Left, Z=Up.*
 
-*Setting the axes in Motive to match the drone inertial frame.*
-
-### OptiTrack Rigid Body
-Create a custom Rigid Body inside the Motive software and give it a name. By default, this project expects the name `drone`. This step is crucial because the `natnet_ros2` package automatically maps the Rigid Body name to the ROS 2 topic name. If you use the default name, the system will publish the data over `/drone/pose`. If you use a custom name, you must pass it as a parameter when launching the nodes as described in the How to Run section.
+It is highly recommended to verify your alignment by running `ros2 launch natnet_ros2 natnet_ros2.launch.py` and checking the `/drone/pose` topic while physically tilting and moving the drone, or by doing a safe flight test using the `axis_test.py` utility.
 
 ![OptiTrack View 1](docs/images/Optitrack1.jpeg)
 ![OptiTrack View 2](docs/images/Optitrack2.jpeg)
+
+Create the Rigid Body inside Motive and name it `drone`. This step is crucial because the `natnet_ros2` package automatically maps the Rigid Body name to the ROS 2 topic name (`/drone/pose`).
 
 ## Network Configuration
 

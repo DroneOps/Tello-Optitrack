@@ -59,28 +59,66 @@ class PosePlotter(Node):
         self.Desired_z = msg.pose.position.z
 
     def plot(self):
+        import numpy as np
+        plt.style.use('ggplot')
+        
         # ---- Figure 1: x, y, z, yaw vs time ----
-        plt.figure(figsize=(10, 8))
-        plt.subplot(4, 1, 1); plt.plot(self.t, self.x, label='x'); plt.grid(); plt.legend()
-        plt.subplot(4, 1, 2); plt.plot(self.t, self.y, label='y'); plt.grid(); plt.legend()
-        plt.subplot(4, 1, 3); plt.plot(self.t, self.z, label='z'); plt.grid(); plt.legend()
-        plt.subplot(4, 1, 4); plt.plot(self.t, self.yaw, label='yaw'); plt.grid(); plt.legend()
-        plt.xlabel('Time [s]')
+        fig1, axs = plt.subplots(4, 1, figsize=(10, 10), sharex=True)
+        fig1.suptitle('Drone Telemetry vs Time', fontsize=16)
+        
+        axs[0].plot(self.t, self.x, color='r', linewidth=2, label='Current X')
+        if hasattr(self, 'Desired_x'):
+            axs[0].axhline(y=self.Desired_x, color='k', linestyle='--', label='Goal X')
+        axs[0].set_ylabel('X [m]')
+        axs[0].legend(loc='upper right')
+        
+        axs[1].plot(self.t, self.y, color='g', linewidth=2, label='Current Y')
+        if hasattr(self, 'Desired_y'):
+            axs[1].axhline(y=self.Desired_y, color='k', linestyle='--', label='Goal Y')
+        axs[1].set_ylabel('Y [m]')
+        axs[1].legend(loc='upper right')
+
+        axs[2].plot(self.t, self.z, color='b', linewidth=2, label='Current Z')
+        if hasattr(self, 'Desired_z'):
+            axs[2].axhline(y=self.Desired_z, color='k', linestyle='--', label='Goal Z')
+        axs[2].set_ylabel('Z [m]')
+        axs[2].legend(loc='upper right')
+
+        axs[3].plot(self.t, self.yaw, color='m', linewidth=2, label='Yaw')
+        axs[3].set_ylabel('Yaw [rad]')
+        axs[3].set_xlabel('Time [s]')
+        axs[3].legend(loc='upper right')
+        
         plt.tight_layout()
 
         # ---- Figure 2: 3D trajectory ----
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.plot(self.x, self.y, self.z, color='blue', label='3D trajectory')
-        ax.scatter(self.x[0], self.y[0], self.z[0], color='green', label='Start')
+        fig2 = plt.figure(figsize=(8, 8))
+        ax = fig2.add_subplot(111, projection='3d')
+        ax.plot(self.x, self.y, self.z, color='blue', linewidth=2, label='3D trajectory')
+        ax.scatter(self.x[0], self.y[0], self.z[0], color='green', s=100, label='Start')
         if hasattr(self, 'Desired_x'):
-            ax.scatter(self.Desired_x, self.Desired_y, self.Desired_z, color='black', label='Goal')
-        ax.scatter(self.x[-1], self.y[-1], self.z[-1], color='red', label='End')
+            ax.scatter(self.Desired_x, self.Desired_y, self.Desired_z, color='black', marker='X', s=150, label='Goal')
+        ax.scatter(self.x[-1], self.y[-1], self.z[-1], color='red', s=100, label='End')
+        
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')
         ax.set_zlabel('Z [m]')
+        ax.set_title('3D Trajectory', fontsize=16)
+        
+        # Force Equal Aspect Ratio for 3D plot to prevent warping
+        try:
+            max_range = np.array([max(self.x)-min(self.x), max(self.y)-min(self.y), max(self.z)-min(self.z)]).max() / 2.0
+            mid_x = (max(self.x)+min(self.x)) * 0.5
+            mid_y = (max(self.y)+min(self.y)) * 0.5
+            mid_z = (max(self.z)+min(self.z)) * 0.5
+            ax.set_xlim(mid_x - max_range, mid_x + max_range)
+            ax.set_ylim(mid_y - max_range, mid_y + max_range)
+            ax.set_zlim(mid_z - max_range, mid_z + max_range)
+            ax.set_box_aspect([1,1,1])
+        except Exception:
+            pass
+            
         ax.legend()
-        ax.set_title('3D trajectory of the drone')
         plt.show()
 
 
