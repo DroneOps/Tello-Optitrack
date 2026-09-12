@@ -44,12 +44,16 @@ class TelloController(Node):
         import sys
         import os
         
-        # Simple and robust: find the workspace root by cutting the path at '/install/'
-        ws_root = os.path.abspath(__file__).split('/install/')[0]
-        utils_path = os.path.join(ws_root, 'utils')
-        
-        if os.path.exists(utils_path) and utils_path not in sys.path:
-            sys.path.append(utils_path)
+        # Search for the utils folder by walking up the directory tree
+        # This works regardless of symlink-install or regular install
+        current_dir = os.path.abspath(os.path.dirname(__file__))
+        while current_dir != '/':
+            potential_utils = os.path.join(current_dir, 'utils')
+            if os.path.exists(os.path.join(potential_utils, 'check_status.py')):
+                if potential_utils not in sys.path:
+                    sys.path.append(potential_utils)
+                break
+            current_dir = os.path.dirname(current_dir)
             
         try:
             from check_status import connect_and_check
