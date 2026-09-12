@@ -92,15 +92,23 @@ class TelloController(Node):
                 self.Kp_x = float(self.config["GAINS"]["Kp_x"])
                 self.Kp_y = float(self.config["GAINS"]["Kp_y"])
                 self.Kp_z = float(self.config["GAINS"]["Kp_z"])
-                self.get_logger().info(f"Loaded gains from pi.conf -> P_x: {self.Kp_x}, P_y: {self.Kp_y}, P_z: {self.Kp_z}")
+                
+                self.Ki_x = float(self.config["GAINS"]["Ki_x"])
+                self.Ki_y = float(self.config["GAINS"]["Ki_y"])
+                self.Ki_z = float(self.config["GAINS"]["Ki_z"])
+                self.max_integral = float(self.config["GAINS"]["max_integral"])
+                
+                self.get_logger().info(f"Loaded PI gains -> Kp:({self.Kp_x}, {self.Kp_y}, {self.Kp_z}) | Ki:({self.Ki_x}, {self.Ki_y}, {self.Ki_z})")
             except KeyError as e:
-                self.get_logger().error(
-                    f"CRITICAL: Missing gain {e} in pi.conf. Aborting flight."
-                )
+                self.get_logger().error(f"CRITICAL: Missing gain {e} in pi.conf. Aborting flight.")
                 sys.exit(1)
         else:
             self.get_logger().error(f"CRITICAL: pi.conf not found at {pi_conf_path}. Refusing to fly without gains. Aborting.")
             sys.exit(1)
+            
+        # PI Controller state variables
+        self.error_sum = np.zeros(3)
+        self.last_time = None
 
     def signal_handler(self, sig, frame):
         # Handle Ctrl+C signal to land the drone safely and shutdown ROS2
@@ -150,6 +158,8 @@ class TelloController(Node):
             self.drone.takeoff()
             self.has_taken_off = True
             self.get_logger().info("Takeoff executed")
+            import time
+            self.last_time = time.time() # Start the PI timer exactly after takeoff
 
         # log the current pose and orientation of the drone for debugging purposes
         # self.get_logger().info(
@@ -198,12 +208,31 @@ class TelloController(Node):
     """calculate inercial velocity"""
 
     def calculateVelocities(self):
+        import time
+        current_time = time.time()
+        
+        # Calculate Delta time (dt)
+        if self.last_time is None:
+            dt = 0.0
+        else:
+            dt = current_time - self.last_time
+        self.last_time = current_time
+
+        # Update Integral (Sum of Errors * dt)
+        self.error_sum += self.Pe * dt
+        
+        # Anti-Windup: Clamp the accumulated error to prevent runaway I-term
+        self.error_sum = np.clip(self.error_sum, -self.max_integral, self.max_integral)
+
         # the inercial velocity is calculated in the inertial frame and then transformed to the body frame using the inverse rotation matrix
         # the body velocity is the one that is sent to the drone, so we need to transform it to the body frame
-        self.InercialVel = np.array(
-            [-self.Kp_x * self.Pe[0], -self.Kp_y *
-                self.Pe[1], -self.Kp_z * self.Pe[2]]
-        )
+        
+        # PI Control Law: V = - (Kp * Error + Ki * Integral)
+        self.InercialVel = np.array([
+            - (self.Kp_x * self.Pe[0] + self.Ki_x * self.error_sum[0]),
+            - (self.Kp_y * self.Pe[1] + self.Ki_y * self.error_sum[1]),
+            - (self.Kp_z * self.Pe[2] + self.Ki_z * self.error_sum[2])
+        ])
 
         self.BodyVelocity = self.Re_inv @ self.InercialVel
 
