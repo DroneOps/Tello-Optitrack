@@ -113,6 +113,23 @@ ros2 run tello_control square_routine
 ```
 When it finishes, the drone will hover at the center `(0, 0, 1)`. You can land the drone at any time by pressing `Ctrl+C` in the terminal running the `tello_controller` node.
 
+## Utilities
+
+The `utils` folder contains standalone scripts for hardware testing and automation:
+
+* **axis_test.py**: Standalone script to test the drone's physical response and sensors without using OptiTrack. It connects to the drone, takes off, sends a pure RC velocity command on a specified axis, logs the internal IMU telemetry, lands, and generates a `.png` plot with the results.
+  Run it from the root of the workspace:
+  ```bash
+  python3 utils/axis_test.py --axis all --duration 3
+  ```
+  **Arguments:**
+  * `--axis`: The axis to test. Available options are `x`, `-x`, `y`, `-y`, `z`, `-z`, `yaw`, `-yaw`, or `all`. If no arguments are passed, the drone will safely default to `z` and move Up. (Note: use `=` for negative axes, e.g., `--axis=-x`)
+  * `--duration`: Time in seconds to hold the velocity command per axis. Default is `3`.
+
+* **connect_wifi.sh**: A bash script that reads the SSID and password from the `tello.conf` configuration file and forces the Linux network manager to connect to the Tello network.
+
+* **check_status.py**: A Python script that loops the WiFi connection process until successful, initializes the DJI SDK, and prints out the drone battery level and internal temperature. This module is used internally by the main controller to guarantee the drone is ready before taking off.
+
 ## Software Architecture
 
 The project is divided into key packages and nodes that communicate via a Publisher-Subscriber architecture:

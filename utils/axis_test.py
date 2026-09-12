@@ -4,23 +4,35 @@ import matplotlib.pyplot as plt
 from djitellopy import Tello
 
 def run_test(drone, axis, duration):
-    vx, vy, vz, yaw = 0, 0, 0, 0
+    vx, vy, vz, y_vel = 0, 0, 0, 0
+    movement_desc = ""
     
-    if axis == "x":
-        vx = 50
-    elif axis == "y":
-        vy = 50
-    elif axis == "z":
-        vz = 50
-    elif axis == "yaw":
-        yaw = 50
+    speed = 50
+    if axis.startswith("-"):
+        speed = -50
+        base_axis = axis[1:]
+    else:
+        base_axis = axis
+
+    if base_axis == "x":
+        vx = speed
+        movement_desc = f"({'+' if speed>0 else '-'}) {'Right' if speed>0 else 'Left'}"
+    elif base_axis == "y":
+        vy = speed
+        movement_desc = f"({'+' if speed>0 else '-'}) {'Forward' if speed>0 else 'Backward'}"
+    elif base_axis == "z":
+        vz = speed
+        movement_desc = f"({'+' if speed>0 else '-'}) {'Up' if speed>0 else 'Down'}"
+    elif base_axis == "yaw":
+        y_vel = speed
+        movement_desc = f"({'+' if speed>0 else '-'}) {'Clockwise' if speed>0 else 'Counter-Clockwise'}"
     
-    print(f"Testing {axis.upper()} axis for {duration} seconds...")
+    print(f"Testing {axis.upper()} axis for {duration} seconds... Direction: {movement_desc}")
     data = {"time": [], "vx": [], "vy": [], "vz": [], "height": [], "yaw": []}
     
     start_time = time.time()
     while time.time() - start_time < duration:
-        drone.send_rc_control(vx, vy, vz, yaw)
+        drone.send_rc_control(vx, vy, vz, y_vel)
         
         data["time"].append(time.time() - start_time)
         data["vx"].append(drone.get_speed_x())
@@ -66,7 +78,7 @@ from check_status import connect_and_check
 
 def main():
     parser = argparse.ArgumentParser(description="Test Tello RC commands across different axes.")
-    parser.add_argument("--axis", choices=["x", "y", "z", "yaw", "all"], default="z", help="Axis to test.")
+    parser.add_argument("--axis", choices=["x", "-x", "y", "-y", "z", "-z", "yaw", "-yaw", "all"], default="z", help="Axis to test (use = for negative, e.g., --axis=-x)")
     parser.add_argument("--duration", type=int, default=3, help="Duration in seconds for each test.")
     args = parser.parse_args()
     
@@ -76,7 +88,7 @@ def main():
     drone.takeoff()
     time.sleep(2)
     
-    axes_to_test = ["x", "y", "z", "yaw"] if args.axis == "all" else [args.axis]
+    axes_to_test = ["x", "-x", "y", "-y", "z", "-z", "yaw", "-yaw"] if args.axis == "all" else [args.axis]
     
     all_data = {"time": [], "vx": [], "vy": [], "vz": [], "height": [], "yaw": []}
     global_time_offset = 0
