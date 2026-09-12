@@ -1,7 +1,11 @@
 import time
 import subprocess
 import os
+import logging
 from djitellopy import Tello
+
+# Mute djitellopy terminal spam (e.g. send rc command logs)
+Tello.LOGGER.setLevel(logging.ERROR)
 
 def connect_and_check():
     """
@@ -12,29 +16,39 @@ def connect_and_check():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     wifi_script = os.path.join(script_dir, "connect_wifi.sh")
     
-    print("Waiting for Tello WiFi network to be available...")
+    print("\n" + "="*55)
+    print("               TELLO PRE-FLIGHT SYSTEM               ")
+    print("="*55)
+    print("[*] SCANNING: Waiting for Tello WiFi network...")
+    
     while True:
         try:
             result = subprocess.run([wifi_script], capture_output=True, text=True)
             if result.returncode == 0:
-                print("WiFi connection established successfully.")
+                print("[+] NETWORK: WiFi connection established successfully.")
                 break
             else:
-                print("WiFi not ready. Retrying in 3 seconds. Press Ctrl+C to abort.")
+                print("[-] STANDBY: WiFi not ready. Retrying in 3 seconds...")
                 time.sleep(3)
         except KeyboardInterrupt:
-            print("\nConnection aborted by user.")
+            print("\n[!] ABORT: Connection aborted by user.")
             exit(1)
             
-    print("Connecting to Tello SDK...")
+    print("[*] HANDSHAKE: Connecting to DJI Tello SDK...")
     drone = Tello()
     drone.connect()
     
     battery = drone.get_battery()
     temp = drone.get_temperature()
     
-    print(f"Battery Level: {battery}%")
-    print(f"Internal Temperature: {temp} C")
+    print("-" * 55)
+    print("                   TELEMETRY DATA                    ")
+    print("-" * 55)
+    print(f"    BATTERY LEVEL        : {battery}%")
+    print(f"    INTERNAL TEMPERATURE : {temp} C")
+    print("-" * 55)
+    print("              SYSTEM READY FOR TAKEOFF               ")
+    print("="*55 + "\n")
     
     return drone
 
