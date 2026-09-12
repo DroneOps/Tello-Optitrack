@@ -44,15 +44,12 @@ class TelloController(Node):
         import sys
         import os
         
-        # Search for the utils folder by walking up the directory tree
-        current_dir = os.path.abspath(os.path.dirname(__file__))
-        while current_dir != '/':
-            potential_utils = os.path.join(current_dir, 'utils')
-            if os.path.exists(os.path.join(potential_utils, 'check_status.py')):
-                if potential_utils not in sys.path:
-                    sys.path.append(potential_utils)
-                break
-            current_dir = os.path.dirname(current_dir)
+        # Simple and robust: find the workspace root by cutting the path at '/install/'
+        ws_root = os.path.abspath(__file__).split('/install/')[0]
+        utils_path = os.path.join(ws_root, 'utils')
+        
+        if os.path.exists(utils_path) and utils_path not in sys.path:
+            sys.path.append(utils_path)
             
         try:
             from check_status import connect_and_check
@@ -73,14 +70,14 @@ class TelloController(Node):
     
     def signal_handler(self, sig, frame):
         # Handle Ctrl+C signal to land the drone safely and shutdown ROS2
-        print("\n[!] Ctrl+C detected. Stopping and landing...")
+        print("\n[!] Ctrl+C detected. Stopping and landing...", flush=True)
         try:
             if self.has_taken_off:
                 self.drone.send_rc_control(0, 0, 0, 0)
                 self.drone.land()
             self.drone.end()
         except Exception as e:
-            print(f"Error during shutdown: {e}")
+            print(f"Error during shutdown: {e}", flush=True)
         finally:
             rclpy.shutdown()
             sys.exit(0)
@@ -118,10 +115,10 @@ class TelloController(Node):
         
         
         #log the current pose and orientation of the drone for debugging purposes
-        self.get_logger().info(
-            f"Pose: ({self.Posex:.3f}, {self.Posey:.3f}, {self.Posez:.3f}) "
-            f"Quat: ({self.Qx:.3f}, {self.Qy:.3f}, {self.Qz:.3f}, {self.Qw:.3f})"
-        )
+        # self.get_logger().info(
+        #     f"Pose: ({self.Posex:.3f}, {self.Posey:.3f}, {self.Posez:.3f}) "
+        #     f"Quat: ({self.Qx:.3f}, {self.Qy:.3f}, {self.Qz:.3f}, {self.Qw:.3f})"
+        # )
 
 
         '''Principal control loop'''
@@ -179,9 +176,10 @@ class TelloController(Node):
     
     '''send data to tello overwriting the rc'''
     def sendDataToTello(self):
-        self.get_logger().info(
-        f"Pe: {self.Pe}, InercialVel: {self.InercialVel}, BodyVel: {self.BodyVelocity}"
-        )
+        # self.get_logger().info(
+        # f"Pe: {self.Pe}, InercialVel: {self.InercialVel}, BodyVel: {self.BodyVelocity}"
+        # )
+        
         #we use a scale factor to convert the velocity from m/s to the range of -100 to 100 that the tello accepts for rc control. We also clip the values to ensure they are within the acceptable range.
 
         scale = 20
@@ -208,12 +206,11 @@ class TelloController(Node):
         y_ok = abs(self.P[1] - self.Desired_y) <= distance_threshold
         z_ok = abs(self.P[2] - self.Desired_z) <= distance_threshold
 
-        # log the distance to the target position for debugging purposes
-        self.get_logger().info(
-            f"Distance to target: x: {abs(self.P[0] - self.Desired_x):.3f}, y: {abs(self.P[1] - self.Desired_y):.3f}, z: {abs(self.P[2] - self.Desired_z):.3f}"
-        )
+        # clean print to terminal without ROS logger spam
+        print(f"Distance to target -> x: {abs(self.P[0] - self.Desired_x):.3f}m | y: {abs(self.P[1] - self.Desired_y):.3f}m | z: {abs(self.P[2] - self.Desired_z):.3f}m", end='\r', flush=True)
         
         if x_ok and y_ok and z_ok:
+            print("\n") # jump to new line because we were using \r
             self.get_logger().warn("Target reached. Publishing flag...")
             msg = Bool()
             msg.data = True

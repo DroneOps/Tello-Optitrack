@@ -19,6 +19,7 @@ def generate_launch_description():
             executable='tello_controller',
             name='tello_controller',
             output='screen',
+            emulate_tty=True,
             parameters=[{'rigid_body_name': LaunchConfiguration('rigid_body_name')}]
         ),
 
