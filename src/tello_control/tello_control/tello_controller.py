@@ -43,18 +43,22 @@ class TelloController(Node):
         # Connect to Tello using the utils check_status script
         import sys
         import os
-        # Add the utils folder to sys.path to import check_status
-        # The node is in src/tello_control/tello_control/
-        # so utils is 4 levels up from this file's directory
-        utils_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../utils"))
-        if os.path.exists(utils_path) and utils_path not in sys.path:
-            sys.path.append(utils_path)
+        
+        # Search for the utils folder by walking up the directory tree
+        current_dir = os.path.abspath(os.path.dirname(__file__))
+        while current_dir != '/':
+            potential_utils = os.path.join(current_dir, 'utils')
+            if os.path.exists(os.path.join(potential_utils, 'check_status.py')):
+                if potential_utils not in sys.path:
+                    sys.path.append(potential_utils)
+                break
+            current_dir = os.path.dirname(current_dir)
             
         try:
             from check_status import connect_and_check
             self.drone = connect_and_check()
-        except ImportError:
-            self.get_logger().error("Could not import check_status from utils. Check paths.")
+        except ImportError as e:
+            self.get_logger().error(f"Could not import check_status from utils: {e}")
             self.drone = Tello()
             self.drone.connect()
             

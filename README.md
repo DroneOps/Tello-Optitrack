@@ -75,14 +75,14 @@ ros2 launch natnet_ros2 natnet_ros2.launch.py
 Once the OptiTrack data is streaming, you can run the control system and the graphs together using the launch file. By default, the system listens to the `/drone/pose` topic. 
 
 ```bash
-ros2 launch tello_control tello_with_plot.launch.py
+ros2 launch tello_control controller_with_plot.launch.py
 ```
 
 **Custom Rigid Body Name:**
 If your Rigid Body in Motive is named something else, for example `my_tello`, you can pass it as a parameter so the nodes listen to the correct topic which would be `/my_tello/pose` in this case:
 
 ```bash
-ros2 launch tello_control tello_with_plot.launch.py rigid_body_name:=my_tello
+ros2 launch tello_control controller_with_plot.launch.py rigid_body_name:=my_tello
 ```
 
 Alternatively, run each node separately. You can also pass the parameter here:
