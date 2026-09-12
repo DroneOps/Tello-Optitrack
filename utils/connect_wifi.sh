@@ -5,7 +5,7 @@ IFACE="wlan0"
 
 # Load configuration from tello.conf
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "$DIR/tello.conf"
+source "$DIR/../config/tello.conf"
 
 # Check if already connected to the desired network
 CURRENT=$(nmcli -t -f active,ssid dev wifi | grep '^yes' | cut -d: -f2)

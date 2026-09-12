@@ -73,7 +73,8 @@ class PosePlotter(Node):
         ax = fig.add_subplot(111, projection='3d')
         ax.plot(self.x, self.y, self.z, color='blue', label='3D trajectory')
         ax.scatter(self.x[0], self.y[0], self.z[0], color='green', label='Start')
-        ax.scatter(self.Desired_x, self.Desired_y, self.Desired_z, color='black', label='Goal')
+        if hasattr(self, 'Desired_x'):
+            ax.scatter(self.Desired_x, self.Desired_y, self.Desired_z, color='black', label='Goal')
         ax.scatter(self.x[-1], self.y[-1], self.z[-1], color='red', label='End')
         ax.set_xlabel('X [m]')
         ax.set_ylabel('Y [m]')

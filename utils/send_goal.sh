@@ -15,4 +15,4 @@ Z=$3
 
 echo "Sending drone to X: $X, Y: $Y, Z: $Z"
 
-ros2 topic pub --once /goal geometry_msgs/PoseStamped "{pose: {position: {x: $X, y: $Y, z: $Z}}}"
+ros2 topic pub --once /goal geometry_msgs/msg/PoseStamped "{pose: {position: {x: $X, y: $Y, z: $Z}}}"
