@@ -47,6 +47,21 @@ def connect_and_check():
     print(f"    BATTERY LEVEL        : {battery}%")
     print(f"    INTERNAL TEMPERATURE : {temp} C")
     print("-" * 55)
+    
+    if int(temp) >= 75:
+        print(" [!] CRITICAL: DRONE IS TOO HOT TO FLY! (>75C)       ")
+        print(" [!] The Tello firmware will block the motors.       ")
+        print(" [!] Please turn it off and let it cool down.        ")
+        print("="*55 + "\n")
+        import sys
+        sys.exit(1)
+        
+    if int(battery) < 10:
+        print(" [!] CRITICAL: BATTERY TOO LOW TO FLY! (<10%)        ")
+        print("="*55 + "\n")
+        import sys
+        sys.exit(1)
+
     print("              SYSTEM READY FOR TAKEOFF               ")
     print("="*55 + "\n")
     
