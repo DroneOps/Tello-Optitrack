@@ -1,36 +1,36 @@
+"""
+Real-time pose plotting and telemetry logger.
+Subscribes to OptiTrack feedback and generates trajectory plots on shutdown.
+"""
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from scipy.spatial.transform import Rotation as R
-import matplotlib.pyplot as plt # Library for plotting the data, we will use it to plot the trajectory of the drone and the desired position in 3D space. We will also use it to plot the x, y, z and yaw angles of the drone over time.
-from mpl_toolkits.mplot3d import Axes3D # Library for 3D plotting, we will use it to plot the trajectory of the drone in 3D space.
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import time
 
-'''This script is used to plot the trajectory of the drone and the desired position in 3D space, as well as the x, y, z and yaw angles over time.
-The data is received from the /drone/pose topic, which is published by the natnet_ros2 package that receives the data from the OptiTrack motion capture system. 
-The desired position is received from the /goal topic, which is published by the user input node.
-The script uses the matplotlib library to plot the data, and it is designed to be run in a Jupyter notebook for better visualization. 
-The script also handles the Ctrl+C signal to plot the data'''
 class PosePlotter(Node):
     def __init__(self):
         super().__init__('pose_plotter')
         
-        # Declare parameter for rigid body name (defaults to 'drone')
+        # Rigid body parameter
         self.declare_parameter('rigid_body_name', 'drone')
         rigid_body_name = self.get_parameter('rigid_body_name').get_parameter_value().string_value
         optitrack_topic = f'/{rigid_body_name}/pose'
 
         self.subscription = self.create_subscription(PoseStamped, optitrack_topic, self.callback, 10)
 
-         #suscriber to goal topic 
+        # Goal subscriber
         self.goal_sub = self.create_subscription(
             PoseStamped, "/goal", self.goal_callback, 10
         )
 
-        #initialize lists to store the data
+        # Telemetry data buffers
         self.x, self.y, self.z, self.yaw, self.t = [], [], [], [], []
         self.start_time = time.time()
-        self.get_logger().info('Ready to Plot.') #send a message to the console to indicate that the node is ready to receive data and plot it.
+        self.get_logger().info('Ready to Plot.')
 
     def callback(self, msg):
         '''callback function to store the data from the optitrack system, it is called every time a new message is received from the /drone/pose topic.
@@ -40,20 +40,20 @@ class PosePlotter(Node):
         self.y.append(msg.pose.position.y)
         self.z.append(msg.pose.position.z)
 
-        # Cuaternion to Euler angles 
+        # Quaternion to Euler angles
         r = R.from_quat([
             msg.pose.orientation.x,
             msg.pose.orientation.y,
             msg.pose.orientation.z,
             msg.pose.orientation.w
         ])
-        yaw = r.as_euler('xyz', degrees=False)[2] #we are only interested in the yaw angle
+        yaw = r.as_euler('xyz', degrees=False)[2]
         self.yaw.append(yaw)
 
         self.t.append(time.time() - self.start_time)
         
     def goal_callback(self, msg):
-        #capture the desired position from the goal topic
+        # Desired position setpoint
         self.Desired_x = msg.pose.position.x
         self.Desired_y = msg.pose.position.y
         self.Desired_z = msg.pose.position.z

@@ -1,19 +1,20 @@
+"""
+Pre-flight check utility.
+Connects to Tello WiFi, initializes the SDK, and verifies battery and temperature.
+"""
+
 import time
 import subprocess
 import os
 import logging
 from djitellopy import Tello
 
-# Mute djitellopy terminal spam (e.g. send rc command logs)
+# Suppress djitellopy logs
 Tello.LOGGER.setLevel(logging.ERROR)
 
 
 def connect_and_check():
-    """
-    Loop until the drone WiFi is found and connected.
-    Then connect the SDK and print basic status.
-    Returns the connected Tello object.
-    """
+    """Connect to Tello WiFi, verify telemetry, and return drone instance."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     wifi_script = os.path.join(script_dir, "connect_wifi.sh")
 

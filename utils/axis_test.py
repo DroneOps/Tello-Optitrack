@@ -1,3 +1,8 @@
+"""
+Diagnostic tool for drone axes.
+Executes open-loop movements along individual or all axes and generates telemetry plots.
+"""
+
 import time
 import argparse
 import matplotlib.pyplot as plt
@@ -15,13 +20,13 @@ def run_test(drone, axis, duration):
         base_axis = axis
 
     if base_axis == "x":
-        vx = speed # X is Forward
+        vx = speed # Forward
         movement_desc = f"({'+' if speed>0 else '-'}) {'Forward' if speed>0 else 'Backward'}"
     elif base_axis == "y":
-        vy = speed # Y is Left
+        vy = speed # Left
         movement_desc = f"({'+' if speed>0 else '-'}) {'Left' if speed>0 else 'Right'}"
     elif base_axis == "z":
-        vz = speed # Z is Up
+        vz = speed # Up
         movement_desc = f"({'+' if speed>0 else '-'}) {'Up' if speed>0 else 'Down'}"
     elif base_axis == "yaw":
         y_vel = speed
@@ -106,7 +111,7 @@ def main():
     parser.add_argument("--duration", type=int, default=3, help="Duration in seconds for each test.")
     args = parser.parse_args()
     
-    # Use the unified check status to connect and get telemetry
+    # Connect and verify drone status
     drone = connect_and_check()
     
     drone.takeoff()

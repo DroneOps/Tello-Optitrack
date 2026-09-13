@@ -2,52 +2,49 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
-from djitellopy import (
-    Tello,
-)  # Library to control the Tello drone, it is a wrapper around the official SDK of the drone that allows us to send commands to the drone and receive data from it.
+from djitellopy import Tello
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import signal
 import sys
 
-"""This script is used to control the Tello drone in a cinematic way, it receives the current position and orientation of the drone from the OptiTrack motion capture system
- through the /drone/pose topic, and it receives the desired position from the user input through the /goal topic. 
- The script uses a simple proportional controller to calculate the velocity that the drone should have in order to reach the desired position, 
- and it sends this velocity to the drone using the send_rc_control method of the djitellopy library. 
- Rotation Matrix is used to transform the velocity from the inertial frame to the body frame of the drone, which is the frame that the drone uses to control its movement."""
+"""
+Kinematic PI position controller for DJI Tello.
+Receives OptiTrack feedback and tracks 3D setpoints from /goal.
+"""
 
 
 class TelloController(Node):
     def __init__(self):
         super().__init__("tello_controller")
 
-        # Declare parameter for rigid body name (defaults to 'drone')
+        # Rigid body parameter
         self.declare_parameter("rigid_body_name", "drone")
         self.rigid_body_name = (
             self.get_parameter(
                 "rigid_body_name").get_parameter_value().string_value
         )
 
-        # flag
+        # Flight state flag
         self.has_taken_off = False
 
-        # ros2 suscriber to optitrack data
+        # OptiTrack pose subscriber
         optitrack_topic = f"/{self.rigid_body_name}/pose"
         self.subscription = self.create_subscription(
             PoseStamped,
-            optitrack_topic,  # topic name from natnet_ros2 package
+            optitrack_topic,
             self.data_callback,
             10,
         )
-        # suscriber to goal topic
+        # Goal subscriber
         self.goal_sub = self.create_subscription(
             PoseStamped, "/goal", self.goal_callback, 10
         )
 
-        # publisher for goal reached
+        # Goal reached publisher
         self.reached_pub = self.create_publisher(Bool, "/goal_reached", 10)
 
-        # Connect to Tello using the utils check_status script
+        # Connect to drone
         import sys
         import os
 
@@ -106,12 +103,12 @@ class TelloController(Node):
             self.get_logger().error(f"CRITICAL: pi.conf not found at {pi_conf_path}. Refusing to fly without gains. Aborting.")
             sys.exit(1)
             
-        # PI Controller state variables
+        # Controller state variables
         self.error_sum = np.zeros(3)
         self.last_time = None
 
     def signal_handler(self, sig, frame):
-        # Handle Ctrl+C signal to land the drone safely and shutdown ROS2
+        # Safe shutdown on SIGINT
         print("\n[!] Ctrl+C detected. Stopping and landing...", flush=True)
         try:
             if self.has_taken_off:
@@ -125,20 +122,19 @@ class TelloController(Node):
             sys.exit(0)
 
     def goal_callback(self, msg):
-        # capture the desired position from the goal topic from the user input
+        # Desired position setpoint
         self.Desired_x = msg.pose.position.x
         self.Desired_y = msg.pose.position.y
         self.Desired_z = msg.pose.position.z
-        self.get_logger().info(f"New objective: ({self.Desired_x}, {self.Desired_y}, {self.Desired_z})")  # log the new goal for debugging purposes
+        self.get_logger().info(f"New objective: ({self.Desired_x}, {self.Desired_y}, {self.Desired_z})")
 
     def data_callback(self, msg):
-        """callback function to capture the current position and orientation of the drone from optitrack data"""
+        """OptiTrack telemetry callback."""
         self.Posex = msg.pose.position.x
         self.Posey = msg.pose.position.y
         self.Posez = msg.pose.position.z
 
-        # get orientation in quaternion format
-        # this is the format that optitrack gives us, but we will convert it to euler angles later for the control loop
+        # Orientation quaternion
         self.Qx = msg.pose.orientation.x
         self.Qy = msg.pose.orientation.y
         self.Qz = msg.pose.orientation.z
@@ -153,13 +149,12 @@ class TelloController(Node):
             return
 
         if not self.has_taken_off:
-            # takeoff the drone if it has not taken this is the first time we receive data and we have a goal
-            # this is done to avoid taking off before we have a goal and to ensure that we have the initial position of the drone before taking off
+            # Auto-takeoff on first setpoint
             self.drone.takeoff()
             self.has_taken_off = True
             self.get_logger().info("Takeoff executed")
             import time
-            self.last_time = time.time() # Start the PI timer exactly after takeoff
+            self.last_time = time.time()
 
         # log the current pose and orientation of the drone for debugging purposes
         # self.get_logger().info(
@@ -168,32 +163,24 @@ class TelloController(Node):
         # )
 
         """Principal control loop"""
-        # calculate variables
         self.control_variables()
-        # calculate velocity
         self.calculateVelocities()
-        # send data after processing
         self.sendDataToTello()
-        # check if it is close enough to the target
         self.CheckIfReached()
 
-    """control variables"""
-
     def control_variables(self):
-        # Convert quaternion to Euler angles to get the yaw angle of the drone, which is needed for the control loop.
+        # Extract yaw angle from quaternion
         self.roll, self.pitch, self.yaw = R.from_quat(
             [self.Qx, self.Qy, self.Qz, self.Qw]
         ).as_euler("xyz", degrees=False)
         # convert to matrix form for easier calculations
         self.P = np.array([self.Posex, self.Posey, self.Posez])
 
-        # desired Matrix for the control loop
+        # Target position vector
         self.desired_P = np.array(
             [self.Desired_x, self.Desired_y, self.Desired_z])
 
-        # inverse rotation matrix to transform from inertial frame to body frame based on the current yaw angle of the drone
-        #  we only consider the yaw angle for the rotation since the drone is assumed to be always parallel to the ground (no roll and pitch)
-        #  and we want to control the velocity in the horizontal plane (x and y) and the vertical velocity (z) independently.
+        # Inverse rotation matrix (inertial to body frame)
         self.Re_inv = np.array(
             [
                 [np.cos(self.yaw), np.sin(self.yaw), 0],
@@ -202,10 +189,8 @@ class TelloController(Node):
             ]
         )
 
-        # calculate error
+        # Position error
         self.Pe = self.P - self.desired_P
-
-    """calculate inercial velocity"""
 
     def calculateVelocities(self):
         import time
@@ -218,12 +203,12 @@ class TelloController(Node):
             dt = current_time - self.last_time
         self.last_time = current_time
 
-        # Update Integral (Sum of Errors * dt)
+        # Update integral error
         self.error_sum += self.Pe * dt
         
-        # Anti-Windup: Clamp the accumulated error to prevent runaway I-term
+        # Anti-windup clamping
         self.error_sum = np.clip(self.error_sum, -self.max_integral, self.max_integral)
-
+        
         # the inercial velocity is calculated in the inertial frame and then transformed to the body frame using the inverse rotation matrix
         # the body velocity is the one that is sent to the drone, so we need to transform it to the body frame
         
@@ -259,15 +244,14 @@ class TelloController(Node):
             lr_command, fb_command, ud_command, self.angularVel)
 
     def CheckIfReached(self):
-        # Check if the drone is close enough to the target position
-        # We use a 15 cm threshold
+        # Check setpoint convergence (15 cm threshold)
         distance_threshold = 0.15
 
         x_ok = abs(self.P[0] - self.Desired_x) <= distance_threshold
         y_ok = abs(self.P[1] - self.Desired_y) <= distance_threshold
         z_ok = abs(self.P[2] - self.Desired_z) <= distance_threshold
 
-        # clean print to terminal without ROS logger spam (throttled to 2Hz to avoid saturation)
+        # clean print to terminal without ROS logger spam 
         import time
 
         if not hasattr(self, "last_print_time"):

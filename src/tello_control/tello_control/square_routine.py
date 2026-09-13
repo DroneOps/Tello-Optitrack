@@ -1,3 +1,8 @@
+"""
+Autonomous flight routine node.
+Sequentially publishes square waypoints to /goal and waits for /goal_reached confirmation.
+"""
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
@@ -10,11 +15,11 @@ class SquareRoutine(Node):
         self.goal_pub = self.create_publisher(PoseStamped, '/goal', 10)
         self.reached_sub = self.create_subscription(Bool, '/goal_reached', self.reached_callback, 10)
         
-        # Declare parameter for wait time at each waypoint
+        # Waypoint wait time parameter
         self.declare_parameter('wait_time', 2.0)
         self.wait_time = self.get_parameter('wait_time').value
         
-        # Define the waypoints for the square and finally returning to center
+        # Square trajectory waypoints
         self.waypoints = [
             (1.0, 1.0, 1.0),
             (1.0, -1.0, 1.0),
@@ -25,7 +30,7 @@ class SquareRoutine(Node):
         self.current_idx = 0
         self.waiting_for_reach = False
         
-        # Start the routine after 2 seconds to allow other nodes to initialize
+        # Initialization delay timer
         self.timer = self.create_timer(2.0, self.start_routine)
         
     def start_routine(self):
@@ -48,13 +53,13 @@ class SquareRoutine(Node):
             self.get_logger().info("Square routine completed! Hovering at center.")
 
     def reached_callback(self, msg):
-        # Only process if we are actively waiting for the drone to reach the point
+        # Process waypoint reached signal
         if msg.data and self.waiting_for_reach:
             self.get_logger().info(f"Waypoint reached! Stabilizing for {self.wait_time} seconds...")
             self.waiting_for_reach = False
             self.current_idx += 1
             
-            # Wait for the specified time before sending the next waypoint
+            # Waypoint transition timer
             self.wait_timer = self.create_timer(self.wait_time, self.next_wp_callback)
 
     def next_wp_callback(self):

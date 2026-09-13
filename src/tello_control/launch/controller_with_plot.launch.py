@@ -1,3 +1,5 @@
+"""Launch Tello controller and pose plotter nodes."""
+
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
@@ -13,7 +15,7 @@ def generate_launch_description():
     return LaunchDescription([
         rigid_body_name_arg,
 
-        # Tello Controller node
+        # Tello controller node
         Node(
             package='tello_control',
             executable='tello_controller',
@@ -23,7 +25,7 @@ def generate_launch_description():
             parameters=[{'rigid_body_name': LaunchConfiguration('rigid_body_name')}]
         ),
 
-        # Nodo de visualización / plotter
+        # Pose plotter node
         Node(
             package='tello_control',
             executable='pose_plotter',

@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Utility script to send a goal position to the drone easily
+# Publishes a target coordinate to the /goal topic via ROS 2.
 # Usage: ./send_goal.sh X Y Z
+
 
 if [ "$#" -ne 3 ]; then
     echo "Usage: $0 X Y Z"
