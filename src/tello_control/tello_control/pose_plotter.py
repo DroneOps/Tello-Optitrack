@@ -8,8 +8,9 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import time
+import os
+from datetime import datetime
 
 class PosePlotter(Node):
     def __init__(self):
@@ -105,7 +106,7 @@ class PosePlotter(Node):
         ax.set_zlabel('Z [m]')
         ax.set_title('3D Trajectory', fontsize=16)
         
-        # Force Equal Aspect Ratio for 3D plot to prevent warping
+        # Force Equal Aspect Ratio for 3D plot to prevent bad plots
         try:
             max_range = np.array([max(self.x)-min(self.x), max(self.y)-min(self.y), max(self.z)-min(self.z)]).max() / 2.0
             mid_x = (max(self.x)+min(self.x)) * 0.5
@@ -120,9 +121,7 @@ class PosePlotter(Node):
             
         ax.legend()
         
-        # Save plots
-        import os
-        from datetime import datetime
+
         
         # Find the root of the workspace to locate the docs folder
         current_dir = os.path.abspath(os.path.dirname(__file__))

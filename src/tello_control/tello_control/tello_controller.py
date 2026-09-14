@@ -7,6 +7,7 @@ from scipy.spatial.transform import Rotation as R
 import numpy as np
 import signal
 import sys
+import os
 
 """
 Kinematic PI position controller for DJI Tello.
@@ -45,8 +46,7 @@ class TelloController(Node):
         self.reached_pub = self.create_publisher(Bool, "/goal_reached", 10)
 
         # Connect to drone
-        import sys
-        import os
+ 
 
         # Search for the utils folder by walking up the directory tree
         # This works regardless of symlink-install or regular install
@@ -95,7 +95,10 @@ class TelloController(Node):
                 self.Ki_z = float(self.config["GAINS"]["Ki_z"])
                 self.max_integral = float(self.config["GAINS"]["max_integral"])
                 
-                self.get_logger().info(f"Loaded PI gains -> Kp:({self.Kp_x}, {self.Kp_y}, {self.Kp_z}) | Ki:({self.Ki_x}, {self.Ki_y}, {self.Ki_z})")
+                self.Kp_yaw = float(self.config["GAINS"]["Kp_yaw"])
+                self.Ki_yaw = float(self.config["GAINS"]["Ki_yaw"])
+                
+                self.get_logger().info(f"Loaded PI gains -> Kp:({self.Kp_x}, {self.Kp_y}, {self.Kp_z}, yaw:{self.Kp_yaw}) | Ki:({self.Ki_x}, {self.Ki_y}, {self.Ki_z}, yaw:{self.Ki_yaw})")
             except KeyError as e:
                 self.get_logger().error(f"CRITICAL: Missing gain {e} in pi.conf. Aborting flight.")
                 sys.exit(1)
@@ -105,6 +108,7 @@ class TelloController(Node):
             
         # Controller state variables
         self.error_sum = np.zeros(3)
+        self.error_sum_yaw = 0.0
         self.last_time = None
 
     def signal_handler(self, sig, frame):
@@ -126,7 +130,21 @@ class TelloController(Node):
         self.Desired_x = msg.pose.position.x
         self.Desired_y = msg.pose.position.y
         self.Desired_z = msg.pose.position.z
-        self.get_logger().info(f"New objective: ({self.Desired_x}, {self.Desired_y}, {self.Desired_z})")
+        
+        # Desired yaw setpoint
+        qx = msg.pose.orientation.x
+        qy = msg.pose.orientation.y
+        qz = msg.pose.orientation.z
+        qw = msg.pose.orientation.w
+        
+        # If no orientation is sent
+        # ROS 2 defaults to [0,0,0,0], which is not a valid quaternion.
+        if qx == 0.0 and qy == 0.0 and qz == 0.0 and qw == 0.0:
+            qw = 1.0 # we assume neutral orientation
+            
+        _, _, self.Desired_yaw = R.from_quat([qx, qy, qz, qw]).as_euler("xyz", degrees=False)
+        
+        self.get_logger().info(f"New objective: Pos({self.Desired_x:.2f}, {self.Desired_y:.2f}, {self.Desired_z:.2f}) Yaw({self.Desired_yaw:.2f} rad)")
 
     def data_callback(self, msg):
         """OptiTrack telemetry callback."""
@@ -191,6 +209,11 @@ class TelloController(Node):
 
         # Position error
         self.Pe = self.P - self.desired_P
+        
+        # Yaw error (normalized to -pi to pi)
+        # Note: Error = Current - Target (same as position logic)
+        yaw_diff = self.yaw - self.Desired_yaw
+        self.Pe_yaw = np.arctan2(np.sin(yaw_diff), np.cos(yaw_diff))
 
     def calculateVelocities(self):
         import time
@@ -203,11 +226,13 @@ class TelloController(Node):
             dt = current_time - self.last_time
         self.last_time = current_time
 
-        # Update integral error
+        # Update integral errors
         self.error_sum += self.Pe * dt
+        self.error_sum_yaw += self.Pe_yaw * dt
         
         # Anti-windup clamping
         self.error_sum = np.clip(self.error_sum, -self.max_integral, self.max_integral)
+        self.error_sum_yaw = np.clip(self.error_sum_yaw, -self.max_integral, self.max_integral)
         
         # the inercial velocity is calculated in the inertial frame and then transformed to the body frame using the inverse rotation matrix
         # the body velocity is the one that is sent to the drone, so we need to transform it to the body frame
@@ -220,6 +245,11 @@ class TelloController(Node):
         ])
 
         self.BodyVelocity = self.Re_inv @ self.InercialVel
+        
+        # Angular Velocity (Yaw)
+        # Tello send_rc_control expects positive for Clockwise rotation.
+        # Our math output matches CCW/CW perfectly with the Tello SDK when passed raw.
+        self.angularVel = int(np.clip(self.Kp_yaw * self.Pe_yaw + self.Ki_yaw * self.error_sum_yaw, -100, 100))
 
     """send data to tello overwriting the rc"""
 
@@ -244,12 +274,14 @@ class TelloController(Node):
             lr_command, fb_command, ud_command, self.angularVel)
 
     def CheckIfReached(self):
-        # Check setpoint convergence (15 cm threshold)
+        # Check setpoint convergence (15 cm threshold for pos, ~11.5 deg for yaw)
         distance_threshold = 0.15
+        yaw_threshold = 0.2
 
         x_ok = abs(self.P[0] - self.Desired_x) <= distance_threshold
         y_ok = abs(self.P[1] - self.Desired_y) <= distance_threshold
         z_ok = abs(self.P[2] - self.Desired_z) <= distance_threshold
+        yaw_ok = abs(self.Pe_yaw) <= yaw_threshold
 
         # clean print to terminal without ROS logger spam 
         import time
@@ -258,10 +290,10 @@ class TelloController(Node):
             self.last_print_time = 0
 
         if time.time() - self.last_print_time > 0.5:
-            print(f"Distance to target -> x: {abs(self.P[0] - self.Desired_x):.3f}m | y: {abs(self.P[1] - self.Desired_y):.3f}m | z: {abs(self.P[2] - self.Desired_z):.3f}m", flush=True)
+            print(f"Error to target -> x: {abs(self.Pe[0]):.3f}m | y: {abs(self.Pe[1]):.3f}m | z: {abs(self.Pe[2]):.3f}m | yaw: {abs(self.Pe_yaw):.2f}rad", flush=True)
             self.last_print_time = time.time()
 
-        if x_ok and y_ok and z_ok:
+        if x_ok and y_ok and z_ok and yaw_ok:
             self.get_logger().warn("Target reached.")
             msg = Bool()
             msg.data = True
