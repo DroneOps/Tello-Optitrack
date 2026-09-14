@@ -110,6 +110,7 @@ class TelloController(Node):
         self.error_sum = np.zeros(3)
         self.error_sum_yaw = 0.0
         self.last_time = None
+        self.get_logger().info("WAITING FOR OPTITRACK DATA... (Check Motive connection)")
 
     def signal_handler(self, sig, frame):
         # Safe shutdown on SIGINT
@@ -137,17 +138,24 @@ class TelloController(Node):
         qz = msg.pose.orientation.z
         qw = msg.pose.orientation.w
         
-        # If no orientation is sent
-        # ROS 2 defaults to [0,0,0,0], which is not a valid quaternion.
+        # If no orientation is sent (e.g., from send_goal.sh or square_routine), 
+        # ROS 2 defaults to [0,0,0,0], which crashes scipy's math. We fix it to neutral.
         if qx == 0.0 and qy == 0.0 and qz == 0.0 and qw == 0.0:
-            qw = 1.0 # we assume neutral orientation
+            qw = 1.0
             
+        from scipy.spatial.transform import Rotation as R
         _, _, self.Desired_yaw = R.from_quat([qx, qy, qz, qw]).as_euler("xyz", degrees=False)
         
-        self.get_logger().info(f"New objective: Pos({self.Desired_x:.2f}, {self.Desired_y:.2f}, {self.Desired_z:.2f}) Yaw({self.Desired_yaw:.2f} rad)")
+        import math
+        yaw_deg = self.Desired_yaw * (180.0 / math.pi)
+        self.get_logger().info(f"New objective: Pos({self.Desired_x:.2f}, {self.Desired_y:.2f}, {self.Desired_z:.2f}) Yaw({yaw_deg:.1f} deg)")
 
     def data_callback(self, msg):
         """OptiTrack telemetry callback."""
+        if not hasattr(self, "first_data_received"):
+            self.first_data_received = True
+            self.get_logger().info("OPTITRACK DATA RECEIVED!")
+            
         self.Posex = msg.pose.position.x
         self.Posey = msg.pose.position.y
         self.Posez = msg.pose.position.z
@@ -160,9 +168,7 @@ class TelloController(Node):
 
         if not hasattr(self, "Desired_x"):
             if not getattr(self, "waiting_for_goal_printed", False):
-                self.get_logger().warn(
-                    "Receiving OptiTrack data... WAITING FOR A GOAL. Use send_goal.sh!"
-                )
+                self.get_logger().warn("WAITING FOR A GOAL. Use send_goal.sh!")
                 self.waiting_for_goal_printed = True
             return
 
@@ -290,7 +296,9 @@ class TelloController(Node):
             self.last_print_time = 0
 
         if time.time() - self.last_print_time > 0.5:
-            print(f"Error to target -> x: {abs(self.Pe[0]):.3f}m | y: {abs(self.Pe[1]):.3f}m | z: {abs(self.Pe[2]):.3f}m | yaw: {abs(self.Pe_yaw):.2f}rad", flush=True)
+            import math
+            yaw_err_deg = abs(self.Pe_yaw) * (180.0 / math.pi)
+            print(f"Error to target -> x: {abs(self.Pe[0]):.3f}m | y: {abs(self.Pe[1]):.3f}m | z: {abs(self.Pe[2]):.3f}m | yaw: {yaw_err_deg:.1f}deg", flush=True)
             self.last_print_time = time.time()
 
         if x_ok and y_ok and z_ok and yaw_ok:

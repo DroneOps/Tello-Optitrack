@@ -48,7 +48,7 @@ class PosePlotter(Node):
             msg.pose.orientation.z,
             msg.pose.orientation.w
         ])
-        yaw = r.as_euler('xyz', degrees=False)[2]
+        yaw = r.as_euler('xyz', degrees=True)[2]
         self.yaw.append(yaw)
 
         self.t.append(time.time() - self.start_time)
@@ -58,6 +58,18 @@ class PosePlotter(Node):
         self.Desired_x = msg.pose.position.x
         self.Desired_y = msg.pose.position.y
         self.Desired_z = msg.pose.position.z
+        
+        # Desired yaw setpoint
+        qx = msg.pose.orientation.x
+        qy = msg.pose.orientation.y
+        qz = msg.pose.orientation.z
+        qw = msg.pose.orientation.w
+        
+        if qx == 0.0 and qy == 0.0 and qz == 0.0 and qw == 0.0:
+            qw = 1.0
+            
+        r = R.from_quat([qx, qy, qz, qw])
+        self.Desired_yaw = r.as_euler('xyz', degrees=True)[2]
 
     def plot(self):
         import numpy as np
@@ -86,7 +98,9 @@ class PosePlotter(Node):
         axs[2].legend(loc='upper right')
 
         axs[3].plot(self.t, self.yaw, color='m', linewidth=2, label='Yaw')
-        axs[3].set_ylabel('Yaw [rad]')
+        if hasattr(self, 'Desired_yaw'):
+            axs[3].axhline(y=self.Desired_yaw, color='k', linestyle='--', label='Goal Yaw')
+        axs[3].set_ylabel('Yaw [deg]')
         axs[3].set_xlabel('Time [s]')
         axs[3].legend(loc='upper right')
         
